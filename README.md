@@ -1,4 +1,4 @@
-# percolate:migrations
+# growone:migrations
 
 [![Build Status](https://travis-ci.org/percolatestudio/meteor-migrations.svg?branch=master)](https://travis-ci.org/percolatestudio/meteor-migrations)
 
@@ -9,7 +9,7 @@ A simple migration system for [Meteor](http://meteor.com) supporting up/downward
 Meteor Migrations can be installed through Meteor's package manager. Type:
 
 ``` sh
-$ meteor add percolate:migrations
+$ meteor add growone:migrations
 ```
 
 ## API
