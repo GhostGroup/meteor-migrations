@@ -1,3 +1,131 @@
+import { Meteor } from 'meteor/meteor';
+import { Mongo } from 'meteor/mongo';
+import Log from './logger';
+
+
+const Migrations = {
+  _actions: {},
+
+  _config: {
+    log: true,
+    logger({ level, message, tag }) {
+      const fn = Log[level] || Log._;
+      fn(message, tag, Meteor.userId());
+    },
+    collectionName: 'migrations',
+  },
+
+  config(options) {
+    this._config = { ...options };
+  },
+
+  createCollection(){
+    this._collection = new Mongo.Collection(this._config.collectionName);
+  },
+
+  add(options) {
+    const {
+      version,
+      name,
+      description,
+      up,
+      down,
+      dependencies = [],
+    };
+
+    if (!version || !up) {
+      throw new Error('You must specify both a version and an UP function.');
+    }
+
+    if (this._actions[version]) {
+      throw new Error(`This migration version already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
+    }
+    if (this._actions[name]) {
+      throw new Error(`This migration name already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
+    }
+
+    this._actions[version] = { ...options };
+    if (name) {
+      this._actions[name] = this._actions[version];
+    }
+  },
+
+  lock() {
+
+  },
+
+  unlock() {
+
+  },
+
+  migrateAll () {
+
+  },
+
+  migrateTo () {
+
+  },
+
+  migrateOne () {
+
+  },
+
+  revertAll () {
+
+  },
+
+  revertTo () {
+
+  },
+
+  revertOne () {
+
+  },
+};
+
+Meteor.startup(() => {
+  Migrations.createCollection();
+
+  if (process.env.MIGRATE_ON_STARTUP) {
+    const [command, version] = MIGRATE_ON_STARTUP.split('|');
+    switch (command) {
+      case 'LATEST':
+      case 'ALL':
+        Migrations.migrateAll();
+        break;
+
+      case 'UPTO':
+        Migrations.migrateTo(version);
+        break;
+
+      case 'ONE':
+        Migrations.migrateOne(version);
+        break;
+
+      case 'REVERT':
+      case 'REVERTALL':
+        Migrations.revertAll();
+        break;
+
+      case 'REVERTTO':
+        Migrations.revertTo(version);
+        break;
+
+      case 'REVERTONE':
+        Migrations.revertOne(version);
+        break;
+
+      case 'UNLOCK':
+        Migrations.unlock();
+        break;
+    };
+  }
+});
+
+
+export default Migrations;
+
+
 /*
   Adds migration capabilities. Migrations are defined like:
 
