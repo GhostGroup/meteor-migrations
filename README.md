@@ -14,104 +14,102 @@ $ meteor add percolate:migrations
 
 ## API
 
-### Basics
+## Migrations.add(options);
 
-To write a simple migration, somewhere in the server section of your project define:
+### options
+* `version <number>` an integer specifying the version number.
+* `up <function>` the code to update the data schema to this version
+* `down <function>` **[optional]** the code to revert the changes in this version
+* `name <string>` **[optional]** a name/label that can be referenced to run a single migration
+* `description <string>` **[optional]** a short description of the migration intent
+* `dependencies <[number|string]>` **[optional]** an array of migration versions and/or names that must be run before this migration can run `up`. the order of dependencies will be determined automatically.
 
-``` javascript
-Migrations.add({
-  version: 1,
-  up: function() {//code to migrate up to version 1}
-});
-```
-
-To run this migration from within your app call:
-
-``` javascript
-Meteor.startup(() => {
-  Migrations.migrateTo('latest');
-});
-```
-
-### Advanced
-
-A more complete set of migrations might look like:
+**note:** `dependencies` are only used for **migrations** `up` and not for **reversions** `down`
 
 ``` javascript
 Migrations.add({
-  version: 1,
-  name: 'Adds pants to some people in the db.',
-  up: function() {//code to migrate up to version 1}
-  down: function() {//code to migrate down to version 0}
-});
-
-Migrations.add({
-  version: 2,
-  name: 'Adds a hat to all people in the db who are wearing pants.',
-  up: function() {//code to migrate up to version 2}
-  down: function() {//code to migrate down to version 1}
-});
-```
-
-As in 'Basics', you can migrate to the latest by running:
-
-``` javascript
-Meteor.startup(function() {
-  Migrations.migrateTo('latest');
+  version: 201711301444,  // date/time as yyyymmddhhmm for human readability
+  name: "GO-6779", // JIRA issue number
+  description: "Added lookup fields on product model for Rob's table", // simple description of the reason for this migration
+  up() {
+    // code to migrate schema up to this version
+  },
+  down() {
+    // code to revert this schema migration
+  },
+  dependencies: [201710310000, "GO-1337", "GO-1234"], // migration versions/names that must be run before this one
 });
 ```
 
-*Note: Migrations should be run from `Meteor.startup` to allow for log output configuration.*
+## Migrations.migrateAll()
+Run all migrations' `up` functions sorted by version.
 
-By specifying a version, you can migrate directly to that version (if possible). The migrations system will automatically determine which direction to migrate in.
-
-In the above example, you could migrate directly to version 2 by running:
-
-``` javascript
-Migrations.migrateTo(2);
-```
-
-If you wanted to undo all of your migrations, you could migrate back down to version 0 by running:
+## Migrations.migrateTo(version|name)
+Run all migrations' `up` functions up to and including the specified migration `version` or `name`. Specify a migration `version` or `name`.
+* `version <number>` the migration version you want to migrate to
+* `name <string>` the migration name you want to migrate to
 
 ``` javascript
-Migrations.migrateTo(0);
+Migrations.migrateTo('GO-1337');
 ```
 
-Sometimes (usually when somethings gone awry), you may need to re-run a migration. You can do this with the rerun subcommand, like:
+## Migrations.migrateOne(version|name)
+Run a single migration `version` or `name` (and its dependencies') `up` function.
+* `version <number>` the migration version you want to run
+* `name <string>` the migration name you want to run
 
 ``` javascript
-Migrations.migrateTo('3,rerun');
+Migrations.migrateOne('GO-1337');
 ```
 
-**NOTE**: You cannot create your own migration at version 0. This version is reserved by migrations for a 'vanilla' system, that is, one without any migrations applied.
 
-To see what version the database is at, call:
+## Migrations.revertAll()
+Run all migrations' `down` functions reverse sorted by version.
+
+
+## Migrations.revertTo(version|name)
+Run all migrations' `down` functions down to and including the specified migration `version` or `name`.
+* `version <number>` the migration version number you want to revert to
+* `name <string>` the migration name you want to revert to
 
 ``` javascript
-Migrations.getVersion();
+Migrations.revertTo('GO-1337');
 ```
 
-### Configuration
+## Migrations.revertOne(version|name)
+Run a single migration `version` or `name` (but **not** its dependencies') `down` function.
+``` javascript
+* `version <number>` the migration version number you want to revert
+* `name <string>` the migration name you want to revert
 
-You can configure Migrations with the `config` method. Defaults are:
+Migrations.revertOne('GO-1337');
+```
 
+## Migrations.getVersion()
+Returns the current schema version information.
+
+
+## Migrations.unlock()
+Unlocks a locked migration collection.
+
+
+## Migrations.config(options)
+### options
+* `log <boolean>` log migration details to the console
+* `logger <function>` **[optional]** a custom logging function (will default to Meteor's logging package)
+* `collectionName <string>` **[optional]** the mongodb collection name to store migration data (default: "migrations")
 ``` javascript
 Migrations.config({
-  // Log job run details to console
   log: true,
-
-  // Use a custom logger function (defaults to Meteor's logging package)
-  logger: null,
-
-  // Enable/disable logging "Not migrating, already at version {number}"
-  logIfLatest: true,
-
-  // migrations collection name to use in the database
-  collectionName: "migrations"
+  logger(data) {
+    // custom logging code...
+  },
+  collectionName: 'migrations',
 });
 ```
 
-### Logging
+
+## Logging
 
 Migrations uses Meteor's `logging` package by default. If you want to use your
 own logger (for sending to other consumers or similar) you can do so by
@@ -120,22 +118,18 @@ configuring the `logger` option.
 Migrations expects a function as `logger`, and will pass arguments to it for
 you to take action on.
 
-```js
-var MyLogger = function(opts) {
-  console.log('Level', opts.level);
-  console.log('Message', opts.message);
-  console.log('Tag', opts.tag);
-}
-
+``` javascript
 Migrations.config({
-  logger: MyLogger
+  logger({ level, message, tag }) {
+    // custom logging code
+  },
 });
 
 Migrations.add({ name: 'Test Job', ... });
 Migrations.start();
 ```
 
-The `opts` object passed to `MyLogger` above includes `level`, `message`, and `tag`.
+The object passed to `logger` above includes `level`, `message`, and `tag`.
 
 - `level` will be one of `info`, `warn`, `error`, `debug`.
 - `message` is something like `Finished migrating.`.
@@ -145,35 +139,11 @@ The `opts` object passed to `MyLogger` above includes `level`, `message`, and `t
 
 By default, the collection name is **migrations**. There may be cases where this is inadequate such as using the same Mongo database for multiple Meteor applications that each have their own set of migrations that need to be run.
 
-### Command line use
-
-*** DEPRECATED ***
-
-This info is for pre 0.9 users as post 0.9 the `migrate.sh` script is no longer included in the package folder.
-
-You can also run migrations from the command line using the included shell script. This will
-
-1. Launch your Meteor app
-2. Call `Migrations.migrateTo(version)`
-3. Exit your app
-
-For instance, from your project's root, run:
-
-``` sh
-$ ./packages/percolatestudio-migrations/migrate.sh latest
-```
-
-You can also specify additional arguments to be passed into meteor, like:
-
-``` sh
-$ ./packages/percolatestudio-migrations/migrate.sh latest --settings ./setting.json
-```
-
 ### Errors
 1. `Not migrating, control is locked`
 
   Migrations set a lock when they are migrating, to prevent multiple instances of your clustered app from running migrations simultaneously. If your migrations throw an exception, you will need to manually remove the lock (and ensure your db is still consistent) before re-running the migration.
-  
+
   From the mongo shell update the migrations collection like this:
 
   ```
@@ -182,7 +152,7 @@ $ ./packages/percolatestudio-migrations/migrate.sh latest --settings ./setting.j
   db.migrations.update({_id:"control"}, {$set:{"locked":false}});
   exit
   ```
-  
+
   Alternatively you can unlock the collection from either server code or the meteor shell using:
 
   ```
