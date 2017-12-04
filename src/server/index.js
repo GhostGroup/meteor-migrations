@@ -1,10 +1,24 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
+import { check, Match } from 'meteor/check';
 import Log from './logger';
+import { isFunction } from './utils';
 
 
 const Migrations = {
-  _actions: {},
+  _migrations: {},
+  _collection: null,
+  _commands: {
+    LATEST: this.migrateAll,
+    ALL: this.migrateAll,
+    ONE: this.migrateOne,
+    UPTO: this.migrateTo,
+    REVERT: this.revertAll,
+    REVERTALL: this.revertAll,
+    REVERTTO: this.revertTo,
+    REVERTONE: this.revertOne,
+    UNLOCK: this.unlock,
+  },
 
   _config: {
     log: true,
@@ -13,6 +27,8 @@ const Migrations = {
       fn(message, tag, Meteor.userId());
     },
     collectionName: 'migrations',
+    migrateOnStartup: false,
+    migrateToVersion: 'latest',
   },
 
   config(options) {
@@ -23,7 +39,15 @@ const Migrations = {
     this._collection = new Mongo.Collection(this._config.collectionName);
   },
 
-  add(options) {
+  exists(versionOrName) {
+    if (!this._migrations[versionOrName]) {
+      throw Meteor.Error(`Sorry, migration ${versionOrName} does not exist.`);
+    }
+
+    return this._migrations[versionOrName];
+  },
+
+  add(migration) {
     const {
       version,
       name,
@@ -31,22 +55,24 @@ const Migrations = {
       up,
       down,
       dependencies = [],
-    };
+    } = migration;
 
-    if (!version || !up) {
-      throw new Error('You must specify both a version and an UP function.');
+    check(version, Match.Integer);
+    if (!isFunction(up)) {
+      throw new Meteor.Error('You must specify both a version and an UP function.');
     }
 
     if (this._actions[version]) {
-      throw new Error(`This migration version already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
+      throw new Meteor.Error(`This migration version already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
     }
     if (this._actions[name]) {
-      throw new Error(`This migration name already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
+      throw new Meteor.Error(`This migration name already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
     }
 
-    this._actions[version] = { ...options };
+    const safeMigration = Object.freeze({ ...migration });
+    this._migrations[version] = safeMigration;
     if (name) {
-      this._actions[name] = this._actions[version];
+      this._migrations[name] = this._actions[version];
     }
   },
 
@@ -58,28 +84,82 @@ const Migrations = {
 
   },
 
+  sortedMigrations(reverse = false) {
+    let keys = Object.keys(this._migrations);
+    if (reverse) {
+      keys.reverse();
+    } else {
+      keys.sort();
+    }
+
+    return keys
+      .map(version => this._migrations[version])
+      .filter(el => Match.test(el, Match.Integer));
+  },
+
   migrateAll () {
-
+    this.sortedMigrations().forEach(migration => {
+      migration.up();
+      // TODO: add some logging in here...
+    });
   },
 
-  migrateTo () {
+  migrateTo (versionOrName) {
+    if (versionOrName === 'latest') {
+      return this.migrateAll();
+    }
 
+    this.exists(versionOrName);
+
+    this.sortedMigrations().some(migration => {
+      migration.up();
+      // TODO: add some logging in here...
+      return migration.version === versionOrName || migration.name === versionOrName;
+    });
   },
 
-  migrateOne () {
+  migrateOne (versionOrName) {
+    const migration = this.exists(versionOrName);
+    const depVersions = migration.dependencies.map(dep => dep.version);
+    depVersions.sort();
+    depVersions.forEach(version => this.migrateOne(version));
 
-  },
+    migration.up();
+      // TODO: add some logging in here...
+    },
 
   revertAll () {
-
+    this.sortedMigrations(true).forEach(migration => {
+      if (isFunction(migration.down)) {
+        migration.down();
+        // TODO: add some logging in here...
+      }
+    });
   },
 
-  revertTo () {
+  revertTo (versionOrName) {
+    if (versionOrName === 'zero') {
+      return this.revertAll();
+    }
 
+    this.exists(versionOrName);
+
+    this.sortedMigrations(true).some(migration => {
+      if (isFunction(migration.down)) {
+        migration.down();
+        // TODO: add some logging in here...
+      }
+
+      return migration.version === versionOrName || migration.name === versionOrName;
+    });
   },
 
-  revertOne () {
-
+  revertOne (versionOrName) {
+    const migration = this.exists(versionOrName);
+    if (isFunction(migration.down)) {
+      migration.down();
+      // TODO: add some logging in here...
+    }
   },
 };
 
@@ -87,38 +167,16 @@ Meteor.startup(() => {
   Migrations.createCollection();
 
   if (process.env.MIGRATE_ON_STARTUP) {
-    const [command, version] = MIGRATE_ON_STARTUP.split('|');
-    switch (command) {
-      case 'LATEST':
-      case 'ALL':
-        Migrations.migrateAll();
-        break;
+    const [command, versionOrName] = MIGRATE_ON_STARTUP.split('|');
+    if (Migrations._commands[command]) {
+      Migrations._commands[command](versionOrName);
+    }
+  } else if (Migrations._config.migrateOnStartup) {
+    Migrations.migrateTo(Migrations._config.migrateToVersion);
+  }
 
-      case 'UPTO':
-        Migrations.migrateTo(version);
-        break;
-
-      case 'ONE':
-        Migrations.migrateOne(version);
-        break;
-
-      case 'REVERT':
-      case 'REVERTALL':
-        Migrations.revertAll();
-        break;
-
-      case 'REVERTTO':
-        Migrations.revertTo(version);
-        break;
-
-      case 'REVERTONE':
-        Migrations.revertOne(version);
-        break;
-
-      case 'UNLOCK':
-        Migrations.unlock();
-        break;
-    };
+  if (process.argv.includes('--once')) {
+    process.exit(0);
   }
 });
 
