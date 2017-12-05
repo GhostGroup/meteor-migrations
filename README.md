@@ -1,5 +1,7 @@
 # growone:migrations
 
+Forked from [percolate:migrations](https://github.com/percolatestudio/meteor-migrations)
+
 [![Build Status](https://travis-ci.org/percolatestudio/meteor-migrations.svg?branch=master)](https://travis-ci.org/percolatestudio/meteor-migrations)
 
 A simple migration system for [Meteor](http://meteor.com) supporting up/downwards migrations and command line usage. There is also [a fork available](https://github.com/emmanuelbuah/mgdb-migrator) for use outside of Meteor.
@@ -14,7 +16,34 @@ $ meteor add growone:migrations
 
 ## API
 
-## Migrations.add(options);
+## Migrations.config(options)
+### options
+* `log <boolean>` log migration details to the console
+* `logger <function>` **[optional]** a custom logging function (will default to Meteor's logging package)
+* `collectionName <string>` **[optional]** the mongodb collection name to store migration data (default: "migrations")
+``` javascript
+Migrations.config({
+  log: true,
+  logger(data) {
+    // custom logging code...
+  },
+  collectionName: 'migrations',
+});
+```
+
+## Migrations.init()
+Initializes the `Migrations` package. This will create the collection and initializes the `control` record.
+``` javascript
+Migrations.config({
+  collectionName: 'migrations',
+});
+Migrations.init();
+```
+
+## Migrations.reset()
+Removes all `migrations` and records from `config.collectionName`.
+
+## Migrations.add(options)
 
 ### options
 * `version <number>` an integer specifying the version number.
@@ -41,77 +70,148 @@ Migrations.add({
 });
 ```
 
-## Migrations.migrateAll()
+## Migrations.migrateAll(force)
 Run all migrations' `up` functions sorted by version.
 
-## Migrations.migrateTo(version|name)
+### options
+* `force <Boolean>` default **false** run the migrations even if we are already at the latest version
+
+
+## Migrations.migrateTo(version|name, force)
 Run all migrations' `up` functions up to and including the specified migration `version` or `name`. Specify a migration `version` or `name`.
-* `version <number>` the migration version you want to migrate to
-* `name <string>` the migration name you want to migrate to
+
+### options
+* `version <number> | name <String>` the migration version you want to migrate to **OR** the migration name you want to migrate to
+* `force <Boolean>` default **false** force the migrations to run even if already at this version or later
 
 ``` javascript
 Migrations.migrateTo('GO-1337');
 ```
 
-## Migrations.migrateOne(version|name)
+
+## Migrations.migrateOne(version|name, force)
 Run a single migration `version` or `name` (and its dependencies') `up` function.
-* `version <number>` the migration version you want to run
-* `name <string>` the migration name you want to run
+
+### options
+* `version <number> | name <String>` the migration version you want to run **OR** the migration name you want to run
+* `force <Boolean>` default **false** force the migration (and dependencies) to run even if already at this version or later
 
 ``` javascript
 Migrations.migrateOne('GO-1337');
 ```
 
 
-## Migrations.revertAll()
+## Migrations.revertAll(force)
 Run all migrations' `down` functions reverse sorted by version.
 
+### options
+* `force <Boolean>` default **false** force the reversion to run even if already at `zero`
 
-## Migrations.revertTo(version|name)
+
+## Migrations.revertTo(version|name, force)
 Run all migrations' `down` functions down to and including the specified migration `version` or `name`.
-* `version <number>` the migration version number you want to revert to
-* `name <string>` the migration name you want to revert to
+
+### options
+* `version <number> | name <String>` the migration version number you want to revert to **OR** the migration name you want to revert to
+* `force <Boolean> default **false** force the reversions to run to this version even if already at this version or lower
 
 ``` javascript
 Migrations.revertTo('GO-1337');
 ```
 
-## Migrations.revertOne(version|name)
+## Migrations.revertOne(version|name, force)
 Run a single migration `version` or `name` (but **not** its dependencies') `down` function.
+
+### options
+* `version <number> | name <String>` the migration version number you want to revert **OR** the migration name you want to revert
+* `force <Boolean>` default **false** force the reversion even if already at this version or lower
+
 ``` javascript
-* `version <number>` the migration version number you want to revert
-* `name <string>` the migration name you want to revert
 
 Migrations.revertOne('GO-1337');
 ```
 
-## Migrations.getVersion()
-Returns the current schema version information.
-
-
-## Migrations.unlock()
-Unlocks a locked migration collection.
-
-
-## Migrations.config(options)
-### options
-* `log <boolean>` log migration details to the console
-* `logger <function>` **[optional]** a custom logging function (will default to Meteor's logging package)
-* `collectionName <string>` **[optional]** the mongodb collection name to store migration data (default: "migrations")
+## Migrations.setCurrentVersion(migration)
+Sets the current migration version for the schema.
 ``` javascript
-Migrations.config({
-  log: true,
-  logger(data) {
-    // custom logging code...
+Migrations.setCurrentVersion({
+  version: 201711301444,
+  name: "GO-6779",
+  description: "Added lookup fields on product model for Rob's table",
+  up() {
+    // code to migrate schema up to this version
   },
-  collectionName: 'migrations',
+  down() {
+    // code to revert this schema migration
+  },
+  dependencies: [201710310000, "GO-1337", "GO-1234"], // migration versions/names that must be run before this one
 });
 ```
+
+## Migrations.getCurrentVersion()
+Returns the current schema version information.
+``` javascript
+const current = Migrations.getCurrentVersion();
+// returns =>
+// {
+//   migration: {
+//     version: 201711301444,
+//     name: "GO-6779",
+//     description: "Added lookup fields on product model for Rob's table", // simple description of the reason for this migration
+//     up() {
+//       // code to migrate schema up to this version
+//     },
+//     down() {
+//       // code to revert this schema migration
+//     },
+//     dependencies: [201710310000, "GO-1337", "GO-1234"], // migration versions/names that must be run before this one
+//   },
+//   version: 201711301444,
+//   name: "GO-6779",
+// }
+```
+
+## Migrations.exists(versionOrName)
+Returns the migration based on `version` or `name`. Throws an exception if there is no matching migration.
+``` javascript
+const migration = Migrations.exists("GO-6779");
+// return =>
+// {
+//   version: 201711301444,
+//   name: "GO-6779",
+//   description: "Added lookup fields on product model for Rob's table", // simple description of the reason for this migration
+//   up() {
+//     // code to migrate schema up to this version
+//   },
+//   down() {
+//     // code to revert this schema migration
+//   },
+//   dependencies: [201710310000, "GO-1337", "GO-1234"], // migration versions/names that must be run before this one
+// }
+```
+
+## Migrations.sortedMigrations(reverse)
+Returns an array of migrations sorted by `version`.
+
+### options
+* `reverse <Boolean>` default **false** return the migrations array in reverse order (largest to smallest version)
+
+### options
+`reverse <Boolean>` default **false** return the array in reverse order (largest to smallest version)
+
+## Migrations.isLocked()
+Throw an exception if the control record is locked.
+
+## Migrations.lock()
+Locks the migration control record.
+
+## Migrations.unlock()
+Unlocks a locked migration control record.
 
 
 ## Logging
 
-Migrations uses Meteor's `logging` package by default. If you want to use your
+Migrations uses [ostrio:loggerconsole](https://github.com/VeliovGroup/Meteor-logger-console) package by default. If you want to use your
 own logger (for sending to other consumers or similar) you can do so by
 configuring the `logger` option.
 
@@ -125,8 +225,11 @@ Migrations.config({
   },
 });
 
+Migrations.init();
+
 Migrations.add({ name: 'Test Job', ... });
-Migrations.start();
+
+Migrations.migrateAll();
 ```
 
 The object passed to `logger` above includes `level`, `message`, and `tag`.
