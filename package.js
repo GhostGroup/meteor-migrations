@@ -6,9 +6,9 @@ Package.describe({
 });
 
 Package.on_use(function(api) {
-  api.versionsFrom('METEOR@1.5');
-  api.use(['ecmascript', 'modules']);
-  api.use(['underscore', 'check', 'mongo', 'ostrio:logger', 'ostrio:loggerconsole'], 'server');
+  api.versionsFrom('1.5');
+  api.use(['ecmascript', 'ostrio:logger@2.0.4', 'ostrio:loggerconsole@2.0.2'], 'server');
+  api.use(['underscore', 'check', 'mongo'], 'server');
   api.mainModule('src/server/index.js', 'server');
 });
 
