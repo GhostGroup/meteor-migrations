@@ -196,8 +196,6 @@ Returns an array of migrations sorted by `version`.
 ### options
 * `reverse <Boolean>` default **false** return the migrations array in reverse order (largest to smallest version)
 
-### options
-`reverse <Boolean>` default **false** return the array in reverse order (largest to smallest version)
 
 ## Migrations.isLocked()
 Throw an exception if the control record is locked.
