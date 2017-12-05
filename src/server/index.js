@@ -32,8 +32,7 @@ export const Migrations = {
     log: true,
     logger({ level, message, tag }) {
       if (this.log) {
-        const fn = Log[level] || Log._;
-        fn(message, tag, Meteor.userId());
+        Log[level || 'info'](message, tag);
       }
     },
     collectionName: 'migrations',
@@ -43,19 +42,21 @@ export const Migrations = {
 
   init() {
     this._collection = this._collection || new Mongo.Collection(this._config.collectionName);
-    this._collection.update({
-      _id: 'control',
-    }, {$set: {
-      current: {
-        migration: defaultMigration,
-        version: defaultMigration.version,
-        name: defaultMigration.name,
-      },
-      locked: false,
-      lastUpdate: new Date(),
-    }}, {
-      upsert: true,
-    });
+    if (!this._collection.findOne({ _id: 'control' })) {
+      this._collection.update({
+        _id: 'control',
+      }, {$set: {
+        current: {
+          migration: defaultMigration,
+          version: defaultMigration.version,
+          name: defaultMigration.name,
+        },
+        locked: false,
+        lastUpdate: new Date(),
+      }}, {
+        upsert: true,
+      });
+    }
   },
 
   __nuke__() {
@@ -147,8 +148,8 @@ export const Migrations = {
     }
 
     return keys
-      .map(version => this._migrations[version])
-      .filter(el => Match.test(el, Match.Integer));
+      .map(version => (Number(version) === this._migrations[version].version) ? this._migrations[version] : null)
+      .filter(el => !!el);
   },
 
   add(migration) {
@@ -161,22 +162,28 @@ export const Migrations = {
       dependencies = [],
     } = migration;
 
-    check(version, Match.Integer);
     if (!isFunction(up)) {
       throw new Meteor.Error('You must specify both a version and an UP function.');
     }
 
-    if (this._actions[version]) {
-      throw new Meteor.Error(`This migration version already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
+    if (this._migrations[version]) {
+      throw new Meteor.Error(`This migration version already exists: [${version}] ${this._migrations[version].name} => ${this._migrations[version].description}`);
     }
-    if (this._actions[name]) {
-      throw new Meteor.Error(`This migration name already exists: [${version}] ${this._actions[version].name} => ${this._actions[version].description}`);
+    if (this._migrations[name]) {
+      throw new Meteor.Error(`This migration name already exists: [${version}] ${this._migrations[version].name} => ${this._migrations[version].description}`);
     }
 
-    const safeMigration = Object.freeze({ ...migration });
+    const safeMigration = Object.freeze({
+      version,
+      name,
+      description,
+      up,
+      down,
+      dependencies,
+    });
     this._migrations[version] = safeMigration;
     if (name) {
-      this._migrations[name] = this._actions[version];
+      this._migrations[name] = this._migrations[version];
     }
 
     this.log({ message: `added migration ${version} ${name}` });
@@ -201,7 +208,7 @@ export const Migrations = {
         migration.up();
         this.setCurrentVersion(migration);
       } catch (e) {
-        this._config.logger({
+        this.log({
           level: 'error',
           message: e,
           tag: 'ERROR',
@@ -216,7 +223,7 @@ export const Migrations = {
     this.isLocked();
 
     if (versionOrName === 'latest') {
-      return this.migrateAll();
+      return this.migrateAll(force);
     }
 
     const checkMigration = this.exists(versionOrName);
@@ -240,7 +247,7 @@ export const Migrations = {
         migration.up();
         this.setCurrentVersion(migration);
       } catch (e) {
-        this._config.logger({
+        this.log({
           level: 'error',
           message: e,
           tag: 'ERROR',
@@ -274,7 +281,7 @@ export const Migrations = {
       migration.up();
       this.setCurrentVersion(migration);
     } catch (e) {
-      this._config.logger({
+      this.log({
         level: 'error',
         message: e,
         tag: 'ERROR',
@@ -302,7 +309,7 @@ export const Migrations = {
           migration.down();
           this.setCurrentVersion(migration);
         } catch (e) {
-          this._config.logger({
+          this.log({
             level: 'error',
             message: e,
             tag: 'ERROR',
@@ -338,7 +345,7 @@ export const Migrations = {
           migration.down();
           this.setCurrentVersion(migration);
         } catch (e) {
-          this._config.logger({
+          this.log({
             level: 'error',
             message: e,
             tag: 'ERROR',
@@ -371,7 +378,7 @@ export const Migrations = {
         migration.down();
         this.setCurrentVersion(migration);
       } catch (e) {
-        this._config.logger({
+        this.log({
           level: 'error',
           message: e,
           tag: 'ERROR',
