@@ -32,7 +32,8 @@ export const Migrations = {
     log: true,
     logger({ level, message, tag }) {
       if (this.log) {
-        Log[level || 'info'](message, tag);
+        const fn = level ? level.toLowerCase() : 'info';
+        Log[fn](message, tag);
       }
     },
     collectionName: 'migrations',
