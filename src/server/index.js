@@ -85,7 +85,7 @@ export const Migrations = {
   },
 
   setCurrentVersion(migration) {
-    this._collection.update({
+    return this._collection.update({
       _id: 'control',
     }, {$set: {
       current: {
@@ -154,6 +154,21 @@ export const Migrations = {
     }
   },
 
+  currentVersionIsEqual(migration) {
+    const current = this.getCurrentVersion();
+    return Number(current.version) === Number(migration.version);
+  },
+
+  currentVersionIsAbove(migration) {
+    const current = this.getCurrentVersion();
+    return Number(current.version) > Number(migration.version);
+  },
+
+  currentVersionIsBelow(migration) {
+    const current = this.getCurrentVersion();
+    return Number(current.version) < Number(migration.version);
+  },
+
   sortedMigrations(reverse = false) {
     let keys = Object.keys(this._migrations);
     if (reverse) {
@@ -163,7 +178,7 @@ export const Migrations = {
     }
 
     return keys
-      .map(version => (Number(version) === this._migrations[version].version) ? this._migrations[version] : null)
+      .map(version => !isNaN(Number(version)) ? this._migrations[version] : null)
       .filter(el => !!el);
   },
 
@@ -210,10 +225,12 @@ export const Migrations = {
     const migrations = this.sortedMigrations();
     if (!force) {
       const current = this.getCurrentVersion();
-      if (current.version >= migrations[migrations.length - 1].version) {
-        this.log({ message: `Migrations at latest version: ${current.version} ${current.name}` });
+      const latest = migrations.pop();
+      if (this.currentVersionIsEqual(latest) || this.currentVersionIsAbove(latest)) {
+        this.log({ message: `Migrations already at latest version: ${current.version} ${current.name}` });
         return;
       }
+      migrations.push(latest);
     }
 
     this.lock();
@@ -249,7 +266,7 @@ export const Migrations = {
     const checkMigration = this.exists(versionOrName);
     if (!force) {
       const current = this.getCurrentVersion();
-      if (current.version > checkMigration.version) {
+      if (this.currentVersionIsAbove(checkMigration)) {
         this.log({
           level: 'DEBUG',
           message: `Migrations are currently at a higher version ${current.version} ${current.name}. Not migrating to ${checkMigration.version} ${checkMigration.name}`,
@@ -257,7 +274,7 @@ export const Migrations = {
         return;
       }
 
-      if (current.version === checkMigration.version) {
+      if (this.currentVersionIsEqual(checkMigration)) {
         this.log({
           level: 'DEBUG',
           message: `Migrations are already at ${checkMigration.version} ${checkMigration.name}. Not migrating.`,
@@ -299,7 +316,7 @@ export const Migrations = {
     const migration = this.exists(versionOrName);
     if (!force) {
       const current = this.getCurrentVersion();
-      if (current.version === migration.version) {
+      if (this.currentVersionIsEqual(migration)) {
         this.log({
           level: 'DEBUG',
           message: `Migrations already at ${migration.version} ${migration.name}. Not migrating.`,
@@ -340,7 +357,7 @@ export const Migrations = {
 
     if (!force) {
       const current = this.getCurrentVersion();
-      if (current.version === defaultMigration.version) {
+      if (this.currentVersionIsEqual(defaultMigration)) {
         this.log({
           level: 'DEBUG',
           message: `No migrations to revert.`,
@@ -381,8 +398,7 @@ export const Migrations = {
 
     const checkMigration = this.exists(versionOrName);
     if (!force) {
-      const current = this.getCurrentVersion();
-      if (current.version < checkMigration.version) {
+      if (this.currentVersionIsBelow(checkMigration)) {
         this.log({
           level: 'DEBUG',
           message: `Migrations are currently at a lower version ${current.version} ${current.name}. Not migrating to ${checkMigration.version} ${checkMigration.name}`,
@@ -390,7 +406,7 @@ export const Migrations = {
         return;
       }
 
-      if (current.version === checkMigration.version) {
+      if (this.currentVersionIsEqual(checkMigration)) {
         this.log({
           level: 'DEBUG',
           message: `Migrations are already at ${checkMigration.version} ${checkMigration.name}. Not migrating.`,
@@ -423,7 +439,7 @@ export const Migrations = {
         }
       }
 
-      return migration.version === versionOrName || migration.name === versionOrName;
+      return Number(migration.version) === Number(versionOrName) || migration.name === versionOrName;
     });
 
     this.unlock();
@@ -434,8 +450,7 @@ export const Migrations = {
 
     const migration = this.exists(versionOrName);
     if (!force) {
-      const current = this.getCurrentVersion();
-      if (current.version === migration.version) {
+      if (this.currentVersionIsEqual(migration)) {
         this.log({
           level: 'DEBUG',
           message: `Migrations already at ${migration.version} ${migration.name}. Not migrating.`,
