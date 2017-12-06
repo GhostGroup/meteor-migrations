@@ -41,7 +41,7 @@ export const Migrations = {
     migrateToVersion: 'latest',
   },
 
-  init() {
+  init(forceUnlock = false) {
     this._collection = this._collection || new Mongo.Collection(this._config.collectionName);
     if (!this._collection.findOne({ _id: 'control' })) {
       this._collection.update({
@@ -57,6 +57,10 @@ export const Migrations = {
       }}, {
         upsert: true,
       });
+    }
+
+    if (forceUnlock) {
+      this.unlock();
     }
   },
 
