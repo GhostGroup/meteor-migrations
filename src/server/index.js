@@ -131,7 +131,7 @@ export const Migrations = {
     if (this.getControl().locked) {
       const message = 'Not migrating, control is locked.';
       this.log({
-        level: 'error',
+        level: 'ERROR',
         message,
         tag: 'ERROR',
       });
@@ -205,11 +205,16 @@ export const Migrations = {
     this.sortedMigrations().forEach(migration => {
       try {
         this.log({ message: `migrating to version: ${migration.version} ${migration.name}` });
-        migration.up();
+        const response = migration.up();
+        this.log({
+          level: 'LOG',
+          message: response,
+          tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+        });
         this.setCurrentVersion(migration);
       } catch (e) {
         this.log({
-          level: 'error',
+          level: 'ERROR',
           message: e,
           tag: 'ERROR',
         });
@@ -230,12 +235,18 @@ export const Migrations = {
     if (!force) {
       const current = this.getCurrentVersion();
       if (current.version > checkMigration.version) {
-        this.log({ message: `Migrations are currently at a higher version ${current.version} ${current.name}. Not migrating to ${checkMigration.version} ${checkMigration.name}` });
+        this.log({
+          level: 'DEBUG',
+          message: `Migrations are currently at a higher version ${current.version} ${current.name}. Not migrating to ${checkMigration.version} ${checkMigration.name}`,
+        });
         return;
       }
 
       if (current.version === checkMigration.version) {
-        this.log({ message: `Migrations are already at ${checkMigration.version} ${checkMigration.name}. Not migrating.` });
+        this.log({
+          level: 'DEBUG',
+          message: `Migrations are already at ${checkMigration.version} ${checkMigration.name}. Not migrating.`,
+        });
         return;
       }
     }
@@ -243,12 +254,20 @@ export const Migrations = {
     this.lock();
     this.sortedMigrations().some(migration => {
       try {
-        this.log({ message: `migrating to version: ${migration.version} ${migration.name}` });
-        migration.up();
+        this.log({
+          level: 'TRACE',
+          message: `migrating to version: ${migration.version} ${migration.name}`,
+        });
+        const response = migration.up();
+        this.log({
+          level: 'LOG',
+          message: response,
+          tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+        });
         this.setCurrentVersion(migration);
       } catch (e) {
         this.log({
-          level: 'error',
+          level: 'ERROR',
           message: e,
           tag: 'ERROR',
         });
@@ -266,7 +285,10 @@ export const Migrations = {
     if (!force) {
       const current = this.getCurrentVersion();
       if (current.version === migration.version) {
-        this.log({ message: `Migrations already at ${migration.version} ${migration.name}. Not migrating.`});
+        this.log({
+          level: 'DEBUG',
+          message: `Migrations already at ${migration.version} ${migration.name}. Not migrating.`,
+        });
         return;
       }
     }
@@ -277,12 +299,20 @@ export const Migrations = {
 
     this.lock();
     try {
-      this.log({ message: `migrating to version: ${migration.version} ${migration.name}` });
-      migration.up();
-      this.setCurrentVersion(migration);
+      this.log({
+        level: 'DEBUG',
+        message: `migrating to version: ${migration.version} ${migration.name}`,
+      });
+      const response = migration.up();
+      this.log({
+        level: 'LOG',
+        message: response,
+        tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+      });
+    this.setCurrentVersion(migration);
     } catch (e) {
       this.log({
-        level: 'error',
+        level: 'ERROR',
         message: e,
         tag: 'ERROR',
       });
@@ -296,7 +326,10 @@ export const Migrations = {
     if (!force) {
       const current = this.getCurrentVersion();
       if (current.version === defaultMigration.version) {
-        this.log({ message: `No migrations to revert.`});
+        this.log({
+          level: 'DEBUG',
+          message: `No migrations to revert.`,
+        });
         return;
       }
     }
@@ -305,12 +338,20 @@ export const Migrations = {
     this.sortedMigrations(true).forEach(migration => {
       if (isFunction(migration.down)) {
         try {
-          this.log({ message: `reverting version: ${migration.version} ${migration.name}` });
-          migration.down();
-          this.setCurrentVersion(migration);
+          this.log({
+            level: 'DEBUG',
+            message: `reverting version: ${migration.version} ${migration.name}`,
+          });
+          const response = migration.down();
+          this.log({
+            level: 'LOG',
+            message: response,
+            tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+          });
+            this.setCurrentVersion(migration);
         } catch (e) {
           this.log({
-            level: 'error',
+            level: 'ERROR',
             message: e,
             tag: 'ERROR',
           });
@@ -327,12 +368,18 @@ export const Migrations = {
     if (!force) {
       const current = this.getCurrentVersion();
       if (current.version < checkMigration.version) {
-        this.log({ message: `Migrations are currently at a lower version ${current.version} ${current.name}. Not migrating to ${checkMigration.version} ${checkMigration.name}` });
+        this.log({
+          level: 'DEBUG',
+          message: `Migrations are currently at a lower version ${current.version} ${current.name}. Not migrating to ${checkMigration.version} ${checkMigration.name}`,
+        });
         return;
       }
 
       if (current.version === checkMigration.version) {
-        this.log({ message: `Migrations are already at ${checkMigration.version} ${checkMigration.name}. Not migrating.` });
+        this.log({
+          level: 'DEBUG',
+          message: `Migrations are already at ${checkMigration.version} ${checkMigration.name}. Not migrating.`,
+        });
         return;
       }
     }
@@ -341,12 +388,20 @@ export const Migrations = {
     this.sortedMigrations(true).some(migration => {
       if (isFunction(migration.down)) {
         try {
-          this.log({ message: `reverting version: ${migration.version} ${migration.name}` });
-          migration.down();
-          this.setCurrentVersion(migration);
+          this.log({
+            level: 'DEBUG',
+            message: `reverting version: ${migration.version} ${migration.name}`,
+          });
+          const response = migration.down();
+          this.log({
+            level: 'LOG',
+            message: response,
+            tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+          });
+            this.setCurrentVersion(migration);
         } catch (e) {
           this.log({
-            level: 'error',
+            level: 'ERROR',
             message: e,
             tag: 'ERROR',
           });
@@ -366,7 +421,10 @@ export const Migrations = {
     if (!force) {
       const current = this.getCurrentVersion();
       if (current.version === migration.version) {
-        this.log({ message: `Migrations already at ${migration.version} ${migration.name}. Not migrating.`});
+        this.log({
+          level: 'DEBUG',
+          message: `Migrations already at ${migration.version} ${migration.name}. Not migrating.`,
+        });
         return;
       }
     }
@@ -374,12 +432,20 @@ export const Migrations = {
     if (isFunction(migration.down)) {
       this.lock();
       try {
-        this.log({ message: `reverting version: ${migration.version} ${migration.name}` });
-        migration.down();
+        this.log({
+          level: 'DEBUG',
+          message: `reverting version: ${migration.version} ${migration.name}`,
+        });
+        const response = migration.down();
+        this.log({
+          level: 'LOG',
+          message: response,
+          tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+        });
         this.setCurrentVersion(migration);
       } catch (e) {
         this.log({
-          level: 'error',
+          level: 'ERROR',
           message: e,
           tag: 'ERROR',
         });
