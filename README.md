@@ -17,10 +17,14 @@ $ meteor add growone:migrations
 ## API
 
 ## Migrations.config(options)
+Configure the Migrations package
 ### options
 * `log <boolean>` log migration details to the console
 * `logger <function>` **[optional]** a custom logging function (will default to Meteor's logging package)
 * `collectionName <string>` **[optional]** the mongodb collection name to store migration data (default: "migrations")
+* `migrateOnStartup <boolean>` default **false** run `migrateTo` on `Meteor.startup`
+* `migrateToVersion <version|name>` default **"latest"** the version to migrate to if `migrateOnStartup` is **true**
+
 ``` javascript
 Migrations.config({
   log: true,
@@ -28,11 +32,16 @@ Migrations.config({
     // custom logging code...
   },
   collectionName: 'migrations',
+  migrateOnStartup: false,
+  migrateToVersion: 'latest',
 });
 ```
 
-## Migrations.init()
+## Migrations.init(forceUnlock)
 Initializes the `Migrations` package. This will create the collection and initializes the `control` record.
+### options
+* `forceUnlock <boolean>` default **false** ensure that migrations are unlocked
+
 ``` javascript
 Migrations.config({
   collectionName: 'migrations',
@@ -232,9 +241,8 @@ Migrations.migrateAll();
 
 The object passed to `logger` above includes `level`, `message`, and `tag`.
 
-- `level` will be one of `info`, `warn`, `error`, `debug`.
-- `message` is something like `Finished migrating.`.
-- `tag` will always be `"Migrations"` (handy for filtering).
+* `level` will be one of `info`, `warn`, `error`, `debug`, `trace`.
+* `message` is something like `Finished migrating.`.
 
 ### Custom collection name
 
