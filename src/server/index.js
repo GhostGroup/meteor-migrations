@@ -109,6 +109,11 @@ export const Migrations = {
   },
 
   lock() {
+    this.log({
+      level: 'WARN',
+      message: 'locking migrations',
+    });
+
     return (this._collection.update({
       _id: 'control',
       locked: false,
@@ -119,6 +124,11 @@ export const Migrations = {
   },
 
   unlock() {
+    this.log({
+      level: 'WARN',
+      message: 'unlocking migrations',
+    });
+
     return (this._collection.update({
       _id: 'control',
       locked: true,
