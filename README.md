@@ -22,6 +22,7 @@ Configure the Migrations package
 * `log <boolean>` log migration details to the console
 * `logger <function>` **[optional]** a custom logging function (will default to Meteor's logging package)
 * `collectionName <string>` **[optional]** the mongodb collection name to store migration data (default: "migrations")
+* `forceUnlockOnStartup <boolean>` default **false** unlocks the `collectionName` on startup
 * `migrateOnStartup <boolean>` default **false** run `migrateTo` on `Meteor.startup`
 * `migrateToVersion <version|name>` default **"latest"** the version to migrate to if `migrateOnStartup` is **true**
 
@@ -32,6 +33,7 @@ Migrations.config({
     // custom logging code...
   },
   collectionName: 'migrations',
+  forceUnlockOnStartup: false,
   migrateOnStartup: false,
   migrateToVersion: 'latest',
 });

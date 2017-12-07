@@ -37,6 +37,7 @@ export const Migrations = {
       }
     },
     collectionName: 'migrations',
+    forceUnlockOnStartup: false,
     migrateOnStartup: false,
     migrateToVersion: 'latest',
   },
@@ -182,6 +183,14 @@ export const Migrations = {
       .filter(el => !!el);
   },
 
+  finished() {
+    const current = this.getCurrentVersion();
+    this.log({
+      level: 'WARN',
+      message: `Migrations currently at version ${current.version} ${current.name} (${current.description})`
+    });
+  },
+
   add(migration) {
     const {
       version,
@@ -236,24 +245,22 @@ export const Migrations = {
     this.lock();
     this.sortedMigrations().forEach(migration => {
       try {
-        this.log({ message: `migrating to version: ${migration.version} ${migration.name}` });
         const response = migration.up();
         this.log({
-          level: 'LOG',
-          message: response,
-          tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+          message: `migrating to version: ${migration.version} ${migration.name}`,
+          tag: response,
         });
         this.setCurrentVersion(migration);
       } catch (e) {
         this.log({
           level: 'ERROR',
           message: e,
-          tag: 'ERROR',
         });
       }
     });
 
     this.unlock();
+    this.finished();
   },
 
   migrateTo (versionOrName, force = false) {
@@ -286,28 +293,23 @@ export const Migrations = {
     this.lock();
     this.sortedMigrations().some(migration => {
       try {
-        this.log({
-          level: 'TRACE',
-          message: `migrating to version: ${migration.version} ${migration.name}`,
-        });
         const response = migration.up();
         this.log({
-          level: 'LOG',
-          message: response,
-          tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+          message: `migrating to version: ${migration.version} ${migration.name}`,
+          tag: response,
         });
         this.setCurrentVersion(migration);
       } catch (e) {
         this.log({
           level: 'ERROR',
           message: e,
-          tag: 'ERROR',
         });
       }
 
       return migration.version === versionOrName || migration.name === versionOrName;
     });
     this.unlock();
+    this.finished();
   },
 
   migrateOne (versionOrName, force = false) {
@@ -331,25 +333,20 @@ export const Migrations = {
 
     this.lock();
     try {
-      this.log({
-        level: 'DEBUG',
-        message: `migrating to version: ${migration.version} ${migration.name}`,
-      });
       const response = migration.up();
       this.log({
-        level: 'LOG',
-        message: response,
-        tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+        message: `migrating to version: ${migration.version} ${migration.name}`,
+        tag: response,
       });
-    this.setCurrentVersion(migration);
+      this.setCurrentVersion(migration);
     } catch (e) {
       this.log({
         level: 'ERROR',
         message: e,
-        tag: 'ERROR',
       });
     }
     this.unlock();
+    this.finished();
   },
 
   revertAll (force = false) {
@@ -370,27 +367,22 @@ export const Migrations = {
     this.sortedMigrations(true).forEach(migration => {
       if (isFunction(migration.down)) {
         try {
-          this.log({
-            level: 'DEBUG',
-            message: `reverting version: ${migration.version} ${migration.name}`,
-          });
           const response = migration.down();
           this.log({
-            level: 'LOG',
-            message: response,
-            tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+            message: `reverting to version: ${migration.version} ${migration.name}`,
+            tag: response,
           });
-            this.setCurrentVersion(migration);
+          this.setCurrentVersion(migration);
         } catch (e) {
           this.log({
             level: 'ERROR',
             message: e,
-            tag: 'ERROR',
           });
         }
       }
     });
     this.unlock();
+    this.finished();
   },
 
   revertTo (versionOrName, force = false) {
@@ -419,22 +411,16 @@ export const Migrations = {
     this.sortedMigrations(true).some(migration => {
       if (isFunction(migration.down)) {
         try {
-          this.log({
-            level: 'DEBUG',
-            message: `reverting version: ${migration.version} ${migration.name}`,
-          });
           const response = migration.down();
           this.log({
-            level: 'LOG',
-            message: response,
-            tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+            message: `reverting to version: ${migration.version} ${migration.name}`,
+            tag: response,
           });
-            this.setCurrentVersion(migration);
+          this.setCurrentVersion(migration);
         } catch (e) {
           this.log({
             level: 'ERROR',
             message: e,
-            tag: 'ERROR',
           });
         }
       }
@@ -443,6 +429,7 @@ export const Migrations = {
     });
 
     this.unlock();
+    this.finished();
   },
 
   revertOne (versionOrName, force = false) {
@@ -462,26 +449,21 @@ export const Migrations = {
     if (isFunction(migration.down)) {
       this.lock();
       try {
-        this.log({
-          level: 'DEBUG',
-          message: `reverting version: ${migration.version} ${migration.name}`,
-        });
         const response = migration.down();
         this.log({
-          level: 'LOG',
-          message: response,
-          tag: `${migration.version} [${migration.name}]: ${migration.description}`,
+          message: `reverting to version: ${migration.version} ${migration.name}`,
+          tag: response,
         });
         this.setCurrentVersion(migration);
       } catch (e) {
         this.log({
           level: 'ERROR',
           message: e,
-          tag: 'ERROR',
         });
       }
       this.unlock();
     }
+    this.finished();
   },
 };
 
@@ -494,7 +476,11 @@ Meteor.startup(() => {
       Migrations._commands[command](versionOrName);
     }
   } else if (Migrations._config.migrateOnStartup) {
-    Migrations.migrateTo(Migrations._config.migrateToVersion);
+    try {
+      Migrations.migrateTo(Migrations._config.migrateToVersion);
+    } catch(e) {
+      console.error(e);
+    }
   }
 
   if (process.argv.includes('--once')) {
